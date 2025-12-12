@@ -1,0 +1,41 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ShyAlly <1447610+ShyAlly@users.noreply.github.com>
+Date: Fri, 12 Dec 2025 10:10:56 -0500
+Subject: [PATCH] LHC - Supporting cardinal directions and random negative
+ spawn locations
+
+
+diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity/Entity.java
+index 9ba9d034fdff4ad03499f2868e09cef8e214ae8e..1a7b31aaf289e32285776648b33d0a5ee55d9e2a 100644
+--- a/net/minecraft/world/entity/Entity.java
++++ b/net/minecraft/world/entity/Entity.java
+@@ -4734,7 +4734,7 @@ public abstract class Entity implements SyncedDataHolder, Nameable, EntityAccess
+                         // If it fails we'll end up at the regular end spawn
+                         BlockPos finalPosition = null;
+                         for (int i = 0; i < 100; i++) {
+-                            BlockPos potentialPosition = new BlockPos(center.getX() + random.nextInt(radius), center.getY(), center.getZ() + random.nextInt(radius));
++                            BlockPos potentialPosition = new BlockPos(center.getX() + random.nextInt(radius * 2) - radius, center.getY(), center.getZ() + random.nextInt(radius * 2) - radius);
+                             BlockPos adjustedSpawn = destination.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, potentialPosition);
+                             if (adjustedSpawn.getY() > 0) {
+                                 // Yay we found one
+@@ -4751,8 +4751,18 @@ public abstract class Entity implements SyncedDataHolder, Nameable, EntityAccess
+                         }
+ 
+                         float yRot;
+-                        if (finalPosition.getX() == 0 || finalPosition.getZ() == 0) {
+-                            yRot = Direction.WEST.toYRot();
++                        if (finalPosition.getX() == 0) {
++                            if (finalPosition.getZ() < 0) {
++                                yRot = Direction.SOUTH.toYRot();
++                            } else {
++                                yRot = Direction.NORTH.toYRot();
++                            }
++                        } else if (finalPosition.getZ() == 0) {
++                            if (finalPosition.getX() < 0) {
++                                yRot = Direction.EAST.toYRot();
++                            } else {
++                                yRot = Direction.WEST.toYRot();
++                            }
+                         } else {
+                             double degrees = Math.toDegrees(Math.atan2(finalPosition.getZ() * -1, finalPosition.getX() * -1));
+                             yRot = (float)(degrees - 90);

@@ -1,0 +1,64 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ShyAlly <1447610+ShyAlly@users.noreply.github.com>
+Date: Fri, 12 Dec 2025 14:22:56 -0500
+Subject: [PATCH] LHC - Supporting end gateways too
+
+
+diff --git a/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java b/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java
+index 12b9a6c16501cb0c01983c44bb247071ce675274..5d6419957444209d742a7e40afa490e9cfa31f44 100644
+--- a/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java
++++ b/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java
+@@ -1,5 +1,6 @@
+ package net.minecraft.world.level.block.entity;
+ 
++import com.github.shyally.RandomEndSpawnFinder;
+ import com.mojang.logging.LogUtils;
+ import javax.annotation.Nullable;
+ import net.minecraft.core.BlockPos;
+@@ -10,6 +11,7 @@ import net.minecraft.data.worldgen.features.EndFeatures;
+ import net.minecraft.nbt.CompoundTag;
+ import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+ import net.minecraft.server.level.ServerLevel;
++import net.minecraft.server.level.ServerPlayer;
+ import net.minecraft.util.Mth;
+ import net.minecraft.util.RandomSource;
+ import net.minecraft.world.level.BlockGetter;
+@@ -21,6 +23,7 @@ import net.minecraft.world.level.block.state.BlockState;
+ import net.minecraft.world.level.chunk.LevelChunk;
+ import net.minecraft.world.level.levelgen.feature.Feature;
+ import net.minecraft.world.level.levelgen.feature.configurations.EndGatewayConfiguration;
++import net.minecraft.world.level.portal.TeleportTransition;
+ import net.minecraft.world.level.storage.ValueInput;
+ import net.minecraft.world.level.storage.ValueOutput;
+ import net.minecraft.world.phys.Vec3;
+@@ -201,9 +204,29 @@ public class TheEndGatewayBlockEntity extends TheEndPortalBlockEntity {
+ 
+ 
+         if (isExactTeleport) {
++            // LHC Begin - Random end gateway spawn
++            if (teleportPos.getX() == 100 && teleportPos.getY() == 50 && teleportPos.getZ() == 0 && toTeleport instanceof ServerPlayer) {
++                // Return portals are always hard coded to these cords
++                RandomEndSpawnFinder.asyncFindRandomEndSpawn(portalWorld, (spawn) -> {
++                    TeleportTransition newTeleport = teleport;
++                    if (spawn != null) {
++                        newTeleport = teleport.withPosition(spawn.position).withRotation(spawn.yRot, teleport.xRot());
++                    }
++                    toTeleport.teleportAsync(
++                            teleport,
++                            net.minecraft.world.entity.Entity.TELEPORT_FLAG_LOAD_CHUNK | net.minecraft.world.entity.Entity.TELEPORT_FLAG_TELEPORT_PASSENGERS,
++                            post == null ? null : (net.minecraft.world.entity.Entity teleportedEntity) -> {
++                                post.onTransition(teleportedEntity);
++                            }
++                    );
++                });
++                return true;
++            }
++            // LHC End
+             // blind teleport
+             return toTeleport.teleportAsync(
+-                teleport, net.minecraft.world.entity.Entity.TELEPORT_FLAG_LOAD_CHUNK | net.minecraft.world.entity.Entity.TELEPORT_FLAG_TELEPORT_PASSENGERS,
++                teleport,
++    net.minecraft.world.entity.Entity.TELEPORT_FLAG_LOAD_CHUNK | net.minecraft.world.entity.Entity.TELEPORT_FLAG_TELEPORT_PASSENGERS,
+                 post == null ? null : (net.minecraft.world.entity.Entity teleportedEntity) -> {
+                     post.onTransition(teleportedEntity);
+                 }

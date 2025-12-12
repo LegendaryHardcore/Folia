@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ShyAlly <1447610+ShyAlly@users.noreply.github.com>
+Date: Fri, 12 Dec 2025 11:10:41 -0500
+Subject: [PATCH] LHC Heightmap is -1
+
+
+diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity/Entity.java
+index 58b426b7f708348db5877daf49f5f049d86ce1fd..45a890a2f9219fbde9cd8de250b7c34717263a4d 100644
+--- a/net/minecraft/world/entity/Entity.java
++++ b/net/minecraft/world/entity/Entity.java
+@@ -4738,12 +4738,13 @@ public abstract class Entity implements SyncedDataHolder, Nameable, EntityAccess
+                             BlockPos randomPositionYZero = new BlockPos(center.getX() + random.nextInt(radius * 2) - radius, center.getY(), center.getZ() + random.nextInt(radius * 2) - radius);
+                             BlockPos potentialPosition = destination.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, randomPositionYZero);
+                             if (potentialPosition.getY() > 0) {
++                                potentialPosition = potentialPosition.atY(potentialPosition.getY() - 1);
++
+                                 BlockState landingBlock = destination.getBlockStateIfLoaded(potentialPosition);
+                                 if (landingBlock == null) {
+                                     LOGGER.info("Random end spawn - Potential location wasn't loaded?");
+                                     continue;
+                                 }
+-                                LOGGER.info("Random end spawn - Potential {} is {}", potentialPosition, landingBlock);
+                                 if (!landingBlock.isSolid()) {
+                                     continue;
+                                 }

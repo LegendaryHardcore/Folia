@@ -1,0 +1,19 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ShyAlly <1447610+ShyAlly@users.noreply.github.com>
+Date: Fri, 12 Dec 2025 11:35:06 -0500
+Subject: [PATCH] LHC - Fence gates are evil
+
+
+diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity/Entity.java
+index 45a890a2f9219fbde9cd8de250b7c34717263a4d..c18f55f60be88a9c196c48ea22d4e0de5ff4a252 100644
+--- a/net/minecraft/world/entity/Entity.java
++++ b/net/minecraft/world/entity/Entity.java
+@@ -4745,7 +4745,7 @@ public abstract class Entity implements SyncedDataHolder, Nameable, EntityAccess
+                                     LOGGER.info("Random end spawn - Potential location wasn't loaded?");
+                                     continue;
+                                 }
+-                                if (!landingBlock.isSolid()) {
++                                if (!landingBlock.isSolidRender()) {
+                                     continue;
+                                 }
+ 

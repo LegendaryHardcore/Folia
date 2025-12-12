@@ -1,0 +1,54 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ShyAlly <1447610+ShyAlly@users.noreply.github.com>
+Date: Fri, 12 Dec 2025 10:59:59 -0500
+Subject: [PATCH] LHC - Random end spawn try more attempts depending on radius
+ and only spawn on solid blocks
+
+
+diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity/Entity.java
+index 1a7b31aaf289e32285776648b33d0a5ee55d9e2a..311bad1665fe65049fa642396de3aff0643422ae 100644
+--- a/net/minecraft/world/entity/Entity.java
++++ b/net/minecraft/world/entity/Entity.java
+@@ -124,6 +124,7 @@ import net.minecraft.world.level.gameevent.GameEvent;
+ import net.minecraft.world.level.levelgen.Heightmap;
+ import net.minecraft.world.level.material.Fluid;
+ import net.minecraft.world.level.material.FluidState;
++import net.minecraft.world.level.material.Fluids;
+ import net.minecraft.world.level.material.PushReaction;
+ import net.minecraft.world.level.portal.PortalShape;
+ import net.minecraft.world.level.portal.TeleportTransition;
+@@ -4730,13 +4731,22 @@ public abstract class Entity implements SyncedDataHolder, Nameable, EntityAccess
+                     (chunks) -> {
+                         var random = ThreadLocalRandom.current();
+ 
+-                        // Limit 100 attempts in case someone does something silly
++                        // Limit attempts in case someone does something silly
+                         // If it fails we'll end up at the regular end spawn
+                         BlockPos finalPosition = null;
+-                        for (int i = 0; i < 100; i++) {
++                        for (int i = 0; i < radius * 4; i++) {
+                             BlockPos potentialPosition = new BlockPos(center.getX() + random.nextInt(radius * 2) - radius, center.getY(), center.getZ() + random.nextInt(radius * 2) - radius);
+-                            BlockPos adjustedSpawn = destination.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, potentialPosition);
++                            BlockPos adjustedSpawn = destination.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, potentialPosition);
+                             if (adjustedSpawn.getY() > 0) {
++                                BlockState landingBlock = destination.getBlockStateIfLoaded(adjustedSpawn);
++                                if (landingBlock == null) {
++                                    LOGGER.info("Random end spawn - Potential location wasn't loaded?");
++                                    continue;
++                                }
++                                if (!landingBlock.isSolid()) {
++                                    continue;
++                                }
++
+                                 // Yay we found one
+                                 finalPosition = adjustedSpawn;
+                                 break;
+@@ -4744,7 +4754,7 @@ public abstract class Entity implements SyncedDataHolder, Nameable, EntityAccess
+                         }
+ 
+                         if (finalPosition == null) {
+-                            LOGGER.info("Failed to find a suitable spot");
++                            LOGGER.info("Random end spawn - Failed to find a suitable spot");
+                             // Nothing to do, rip
+                             originalPortalInfoCompletable.complete(info);
+                             return;
