@@ -1,0 +1,59 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ShyAlly <1447610+ShyAlly@users.noreply.github.com>
+Date: Fri, 12 Dec 2025 16:23:13 -0500
+Subject: [PATCH] LHC - Fixing threading issue with teleporting player
+
+
+diff --git a/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java b/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java
+index 5d6419957444209d742a7e40afa490e9cfa31f44..c7339da651db92016599cedac0729396377eae14 100644
+--- a/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java
++++ b/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java
+@@ -1,5 +1,6 @@
+ package net.minecraft.world.level.block.entity;
+ 
++import ca.spottedleaf.moonrise.common.util.TickThread;
+ import com.github.shyally.RandomEndSpawnFinder;
+ import com.mojang.logging.LogUtils;
+ import javax.annotation.Nullable;
+@@ -206,18 +207,34 @@ public class TheEndGatewayBlockEntity extends TheEndPortalBlockEntity {
+         if (isExactTeleport) {
+             // LHC Begin - Random end gateway spawn
+             if (teleportPos.getX() == 100 && teleportPos.getY() == 50 && teleportPos.getZ() == 0 && toTeleport instanceof ServerPlayer) {
++                int chunkX = toTeleport.getBlockX() >> 4;
++                int chunkZ = toTeleport.getBlockZ() >> 4;
++
+                 // Return portals are always hard coded to these cords
+                 RandomEndSpawnFinder.asyncFindRandomEndSpawn(portalWorld, (spawn) -> {
+-                    TeleportTransition newTeleport = teleport;
+-                    if (spawn != null) {
++                    final TeleportTransition newTeleport;
++                    if (spawn == null) {
++                        newTeleport = teleport;
++                    } else {
+                         newTeleport = teleport.withPosition(spawn.position).withRotation(spawn.yRot, teleport.xRot());
+                     }
+-                    toTeleport.teleportAsync(
+-                            teleport,
+-                            net.minecraft.world.entity.Entity.TELEPORT_FLAG_LOAD_CHUNK | net.minecraft.world.entity.Entity.TELEPORT_FLAG_TELEPORT_PASSENGERS,
+-                            post == null ? null : (net.minecraft.world.entity.Entity teleportedEntity) -> {
+-                                post.onTransition(teleportedEntity);
++
++                    io.papermc.paper.threadedregions.RegionizedServer.getInstance().taskQueue.queueTickTaskQueue(
++                        portalWorld,
++                        chunkX,
++                        chunkZ,
++                        () -> {
++                            // Somehow the player went somewhere else
++                            if (!TickThread.isTickThreadFor(toTeleport)) {
++                                return;
+                             }
++
++                            toTeleport.teleportAsync(
++                                newTeleport,
++                            net.minecraft.world.entity.Entity.TELEPORT_FLAG_LOAD_CHUNK | net.minecraft.world.entity.Entity.TELEPORT_FLAG_TELEPORT_PASSENGERS,
++                                post == null ? null : (net.minecraft.world.entity.Entity teleportedEntity) -> { post.onTransition(teleportedEntity); }
++                            );
++                        }
+                     );
+                 });
+                 return true;
