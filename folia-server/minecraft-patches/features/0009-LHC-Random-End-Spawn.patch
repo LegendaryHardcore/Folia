@@ -1,0 +1,79 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ShyAlly <1447610+ShyAlly@users.noreply.github.com>
+Date: Thu, 11 Dec 2025 23:07:50 -0500
+Subject: [PATCH] LHC Random End Spawn
+
+
+diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity/Entity.java
+index 8a17bb73522bf16a35b3b15f318d2de97f2d007f..1a6f4b803850361ac977f8a6fde48f3be354c53a 100644
+--- a/net/minecraft/world/entity/Entity.java
++++ b/net/minecraft/world/entity/Entity.java
+@@ -24,6 +24,7 @@ import java.util.Objects;
+ import java.util.Optional;
+ import java.util.Set;
+ import java.util.UUID;
++import java.util.concurrent.ThreadLocalRandom;
+ import java.util.concurrent.atomic.AtomicInteger;
+ import java.util.function.BiConsumer;
+ import java.util.function.Predicate;
+@@ -4647,7 +4648,14 @@ public abstract class Entity implements SyncedDataHolder, Nameable, EntityAccess
+         List<EntityTreeNode> fullPassengerTree = passengerTree.getFullTree();
+         ServerLevel originWorld = (ServerLevel)this.level;
+ 
++        // LHC Begin - isPlayerTeleport define
++        boolean isPlayerTeleport = false;
++        // LHC End
++
+         for (EntityTreeNode node : fullPassengerTree) {
++            // LHC Begin - isPlayerTeleport set
++            isPlayerTeleport = isPlayerTeleport || node.root instanceof ServerPlayer;
++            // LHC End
+             node.root.preChangeDimension();
+             node.root.prePortalLogic(originWorld, destination, type);
+         }
+@@ -4706,6 +4714,45 @@ public abstract class Entity implements SyncedDataHolder, Nameable, EntityAccess
+             );
+         });
+ 
++        // LHC Begin - find random position when possible
++        if (isPlayerTeleport && type == PortalType.END && destination.getTypeKey() == net.minecraft.world.level.dimension.LevelStem.END) {
++            final ca.spottedleaf.concurrentutil.completable.CallbackCompletable<TeleportTransition> originalPortalInfoCompletable = portalInfoCompletable;
++            portalInfoCompletable = new ca.spottedleaf.concurrentutil.completable.CallbackCompletable<>();
++
++            portalInfoCompletable.addWaiter((TeleportTransition info, Throwable throwable) -> {
++                BlockPos center = new BlockPos(0, 0, 0);
++                final int radius = 100;
++
++                destination.moonrise$loadChunksAsync(
++                        center,
++                        radius + 1, // load 16 blocks to be safe from block physics
++                        ca.spottedleaf.concurrentutil.util.Priority.HIGH,
++                        (chunks) -> {
++                            var random = ThreadLocalRandom.current();
++
++                            // Limit 100 attempts in case someone does something silly
++                            // If it fails we'll end up at the regular end spawn
++                            BlockPos finalPosition = null;
++                            for (int i = 0; i < 100; i++) {
++                                BlockPos potentialPosition = new BlockPos(center.getX() + random.nextInt(radius), center.getY(), center.getZ() + random.nextInt(radius));
++                                BlockPos adjustedSpawn = destination.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, potentialPosition);
++                                if (adjustedSpawn.getY() > 0) {
++                                    // Yay we found one
++                                    finalPosition = potentialPosition;
++                                    break;
++                                }
++                            }
++
++                            if (finalPosition == null) {
++                                // Nothing to do, rip
++                                originalPortalInfoCompletable.complete(info);
++                                return;
++                            }
++                        }
++                );
++            });
++        }
++        // LHC End
+ 
+         passengerTree.root.findOrCreatePortalAsync(originWorld, portalPos, destination, type, portalInfoCompletable);
+ 
