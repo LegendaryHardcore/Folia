@@ -5,7 +5,7 @@ Subject: [PATCH] LHC Random End Spawn
 
 
 diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity/Entity.java
-index 8a17bb73522bf16a35b3b15f318d2de97f2d007f..1a6f4b803850361ac977f8a6fde48f3be354c53a 100644
+index 8a17bb73522bf16a35b3b15f318d2de97f2d007f..9ba9d034fdff4ad03499f2868e09cef8e214ae8e 100644
 --- a/net/minecraft/world/entity/Entity.java
 +++ b/net/minecraft/world/entity/Entity.java
 @@ -24,6 +24,7 @@ import java.util.Objects;
@@ -31,7 +31,7 @@ index 8a17bb73522bf16a35b3b15f318d2de97f2d007f..1a6f4b803850361ac977f8a6fde48f3b
              node.root.preChangeDimension();
              node.root.prePortalLogic(originWorld, destination, type);
          }
-@@ -4706,6 +4714,45 @@ public abstract class Entity implements SyncedDataHolder, Nameable, EntityAccess
+@@ -4706,6 +4714,76 @@ public abstract class Entity implements SyncedDataHolder, Nameable, EntityAccess
              );
          });
  
@@ -42,34 +42,65 @@ index 8a17bb73522bf16a35b3b15f318d2de97f2d007f..1a6f4b803850361ac977f8a6fde48f3b
 +
 +            portalInfoCompletable.addWaiter((TeleportTransition info, Throwable throwable) -> {
 +                BlockPos center = new BlockPos(0, 0, 0);
-+                final int radius = 100;
++                final int radius = 80;
 +
 +                destination.moonrise$loadChunksAsync(
-+                        center,
-+                        radius + 1, // load 16 blocks to be safe from block physics
-+                        ca.spottedleaf.concurrentutil.util.Priority.HIGH,
-+                        (chunks) -> {
-+                            var random = ThreadLocalRandom.current();
++                    center,
++                    radius + 16,
++                    ca.spottedleaf.concurrentutil.util.Priority.HIGH,
++                    (chunks) -> {
++                        var random = ThreadLocalRandom.current();
 +
-+                            // Limit 100 attempts in case someone does something silly
-+                            // If it fails we'll end up at the regular end spawn
-+                            BlockPos finalPosition = null;
-+                            for (int i = 0; i < 100; i++) {
-+                                BlockPos potentialPosition = new BlockPos(center.getX() + random.nextInt(radius), center.getY(), center.getZ() + random.nextInt(radius));
-+                                BlockPos adjustedSpawn = destination.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, potentialPosition);
-+                                if (adjustedSpawn.getY() > 0) {
-+                                    // Yay we found one
-+                                    finalPosition = potentialPosition;
-+                                    break;
-+                                }
-+                            }
-+
-+                            if (finalPosition == null) {
-+                                // Nothing to do, rip
-+                                originalPortalInfoCompletable.complete(info);
-+                                return;
++                        // Limit 100 attempts in case someone does something silly
++                        // If it fails we'll end up at the regular end spawn
++                        BlockPos finalPosition = null;
++                        for (int i = 0; i < 100; i++) {
++                            BlockPos potentialPosition = new BlockPos(center.getX() + random.nextInt(radius), center.getY(), center.getZ() + random.nextInt(radius));
++                            BlockPos adjustedSpawn = destination.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, potentialPosition);
++                            if (adjustedSpawn.getY() > 0) {
++                                // Yay we found one
++                                finalPosition = adjustedSpawn;
++                                break;
 +                            }
 +                        }
++
++                        if (finalPosition == null) {
++                            LOGGER.info("Failed to find a suitable spot");
++                            // Nothing to do, rip
++                            originalPortalInfoCompletable.complete(info);
++                            return;
++                        }
++
++                        float yRot;
++                        if (finalPosition.getX() == 0 || finalPosition.getZ() == 0) {
++                            yRot = Direction.WEST.toYRot();
++                        } else {
++                            double degrees = Math.toDegrees(Math.atan2(finalPosition.getZ() * -1, finalPosition.getX() * -1));
++                            yRot = (float)(degrees - 90);
++                            if (yRot > 180) {
++                                yRot -= 360;
++                            }
++                            if (yRot < -180) {
++                                yRot += 360;
++                            }
++                        }
++
++                        Vec3 playerPosition = finalPosition.getCenter().add(0, 0.6, 0);
++                        LOGGER.info("Random end spawn - calculated position: {} facing {}", playerPosition, yRot);
++
++                        originalPortalInfoCompletable.complete(
++                            new TeleportTransition(
++                                destination,
++                                playerPosition,
++                                info.deltaMovement(),
++                                yRot,
++                                info.xRot(),
++                                info.relatives(),
++                                info.postTeleportTransition(),
++                                info.cause()
++                            )
++                        );
++                    }
 +                );
 +            });
 +        }
