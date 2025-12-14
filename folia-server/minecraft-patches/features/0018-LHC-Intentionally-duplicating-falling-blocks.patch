@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ShyAlly <1447610+ShyAlly@users.noreply.github.com>
+Date: Fri, 12 Dec 2025 18:15:57 -0500
+Subject: [PATCH] LHC - Intentionally duplicating falling blocks
+
+
+diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity/Entity.java
+index 03bf18431a1127841942cd2518203ad4c311414f..3a05c903ca5cf4f992abe9918a29a3d39e4e5300 100644
+--- a/net/minecraft/world/entity/Entity.java
++++ b/net/minecraft/world/entity/Entity.java
+@@ -89,6 +89,7 @@ import net.minecraft.world.InteractionResult;
+ import net.minecraft.world.Nameable;
+ import net.minecraft.world.damagesource.DamageSource;
+ import net.minecraft.world.damagesource.DamageSources;
++import net.minecraft.world.entity.item.FallingBlockEntity;
+ import net.minecraft.world.entity.item.ItemEntity;
+ import net.minecraft.world.entity.player.Player;
+ import net.minecraft.world.entity.projectile.Projectile;
+@@ -3428,7 +3429,13 @@ public abstract class Entity implements SyncedDataHolder, Nameable, EntityAccess
+         if (this.level() instanceof ServerLevel serverLevel) {
+             this.processPortalCooldown();
+             if (this.portalProcess != null) {
+-                if (this.portalProcess.processPortalTeleportation(serverLevel, this, this.canUsePortal(false))) {
++                // LHC start - allow duplicating falling blocks
++                boolean canUsePortal = this.canUsePortal(false);
++                if (!canUsePortal && !isAlive() && this instanceof FallingBlockEntity fbe) {
++                    fbe.spawnAtLocation(serverLevel, fbe.blockState.getBlock());
++                }
++                // LHC end
++                if (this.portalProcess.processPortalTeleportation(serverLevel, this, canUsePortal)) {
+                     ProfilerFiller profilerFiller = Profiler.get();
+                     profilerFiller.push("portal");
+                     this.setPortalCooldown();
