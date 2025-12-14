@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ShyAlly <1447610+ShyAlly@users.noreply.github.com>
+Date: Sun, 14 Dec 2025 02:34:12 -0500
+Subject: [PATCH] LHC - Fix for ender pearl thrown into portal phasing us
+ through blocks
+
+
+diff --git a/net/minecraft/world/entity/projectile/ThrownEnderpearl.java b/net/minecraft/world/entity/projectile/ThrownEnderpearl.java
+index a2b3a744acca66c1d4b2b73512b69e411c2580e4..ea055cc1f7e545942d2cef3583d3898786269a8b 100644
+--- a/net/minecraft/world/entity/projectile/ThrownEnderpearl.java
++++ b/net/minecraft/world/entity/projectile/ThrownEnderpearl.java
+@@ -2,6 +2,8 @@ package net.minecraft.world.entity.projectile;
+ 
+ import java.util.UUID;
+ import javax.annotation.Nullable;
++
++import com.mojang.logging.LogUtils;
+ import net.minecraft.core.BlockPos;
+ import net.minecraft.core.SectionPos;
+ import net.minecraft.core.particles.ParticleTypes;
+@@ -93,7 +95,11 @@ public class ThrownEnderpearl extends ThrowableItemProjectile {
+     }
+ 
+     // Folia start - region threading
+-    private static void attemptTeleport(Entity source, ServerLevel checkWorld, net.minecraft.world.phys.Vec3 to) {
++    // LHC Start - Fix ender pearls fucking your shit up
++    private static void attemptTeleport(Entity source, ServerLevel checkWorld, net.minecraft.world.phys.Vec3 originalTo) {
++        final Vec3 to = new Vec3(originalTo.x, Math.ceil(originalTo.y * 100) / 100, originalTo.z);
++        // LHC End
++
+         final boolean onPortalCooldown = source.isOnPortalCooldown();
+         // ignore retired callback, in those cases we do not want to teleport
+         source.getBukkitEntity().taskScheduler.schedule(
