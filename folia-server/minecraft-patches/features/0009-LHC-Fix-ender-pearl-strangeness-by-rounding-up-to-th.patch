@@ -2,9 +2,215 @@ From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: ShyAlly <1447610+ShyAlly@users.noreply.github.com>
 Date: Sat, 10 Jan 2026 12:46:49 -0500
 Subject: [PATCH] LHC - Fix ender pearl strangeness by rounding up to the
- nearest 100th Y level
+ nearest 100th Y level LHC - Random end spawn, random gateway spawn LHC -
+ Allowing falling block entity duplication
 
 
+diff --git a/com/github/shyally/RandomEndSpawn.java b/com/github/shyally/RandomEndSpawn.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..82bd05a38f09e2c2c33fbd7a606a034d64861ea8
+--- /dev/null
++++ b/com/github/shyally/RandomEndSpawn.java
+@@ -0,0 +1,9 @@
++package com.github.shyally;
++
++import net.minecraft.world.phys.Vec3;
++
++public class RandomEndSpawn {
++
++    public Vec3 position;
++    public float yRot;
++}
+diff --git a/com/github/shyally/RandomEndSpawnFinder.java b/com/github/shyally/RandomEndSpawnFinder.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..dc9d7d7bacfb38e7528d4554e51dbc6531cdcf9e
+--- /dev/null
++++ b/com/github/shyally/RandomEndSpawnFinder.java
+@@ -0,0 +1,105 @@
++package com.github.shyally;
++
++import com.mojang.logging.LogUtils;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.server.level.ServerLevel;
++import net.minecraft.world.level.block.state.BlockState;
++import net.minecraft.world.level.levelgen.Heightmap;
++import net.minecraft.world.phys.Vec3;
++import org.slf4j.Logger;
++
++import java.util.concurrent.ThreadLocalRandom;
++import java.util.function.Consumer;
++
++public class RandomEndSpawnFinder {
++
++    private static final Logger LOGGER = LogUtils.getLogger();
++
++    public static void asyncFindRandomEndSpawn(ServerLevel destination, Consumer<RandomEndSpawn> position) {
++        BlockPos center = new BlockPos(0, 0, 0);
++        final int radius = 80;
++
++        destination.moonrise$loadChunksAsync(
++                center,
++                radius + 16,
++                ca.spottedleaf.concurrentutil.util.Priority.HIGH,
++                (chunks) -> {
++                    // Keep chunks loaded for a bit
++                    for (net.minecraft.world.level.chunk.ChunkAccess access : chunks) {
++                        destination.moonrise$getChunkTaskScheduler().chunkHolderManager.addTicketAtLevel(
++                                net.minecraft.server.level.TicketType.DELAYED,
++                                access.getPos(),
++                                ca.spottedleaf.moonrise.patches.chunk_system.scheduling.ChunkHolderManager.FULL_LOADED_TICKET_LEVEL,
++                                null
++                        );
++                    }
++
++                    var random = ThreadLocalRandom.current();
++
++                    // Limit attempts in case someone does something silly
++                    // If it fails we'll end up at the regular end spawn
++                    BlockPos finalPosition = null;
++                    for (int i = 0; i < radius * 4; i++) {
++                        BlockPos randomPositionYZero = new BlockPos(center.getX() + random.nextInt(radius * 2) - radius, center.getY(), center.getZ() + random.nextInt(radius * 2) - radius);
++                        BlockPos potentialPosition = destination.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, randomPositionYZero);
++                        if (potentialPosition.getY() > 0) {
++                            potentialPosition = potentialPosition.atY(potentialPosition.getY() - 1);
++
++                            BlockState landingBlock = destination.getBlockStateIfLoaded(potentialPosition);
++                            if (landingBlock == null) {
++                                LOGGER.info("Random end spawn - Potential location wasn't loaded?");
++                                continue;
++                            }
++                            if (!landingBlock.isSolidRender()) {
++                                continue;
++                            }
++
++                            // Yay we found one
++                            finalPosition = potentialPosition;
++                            break;
++                        }
++                    }
++
++                    if (finalPosition == null) {
++                        LOGGER.info("Random end spawn - Failed to find a suitable spot");
++                        position.accept(null);
++                        return;
++                    }
++
++                    float yRot;
++                    if (finalPosition.getX() == 0) {
++                        if (finalPosition.getZ() < 0) {
++                            yRot = Direction.SOUTH.toYRot();
++                        } else {
++                            yRot = Direction.NORTH.toYRot();
++                        }
++                    } else if (finalPosition.getZ() == 0) {
++                        if (finalPosition.getX() < 0) {
++                            yRot = Direction.EAST.toYRot();
++                        } else {
++                            yRot = Direction.WEST.toYRot();
++                        }
++                    } else {
++                        double degrees = Math.toDegrees(Math.atan2(finalPosition.getZ() * -1, finalPosition.getX() * -1));
++                        yRot = (float) (degrees - 90);
++                        if (yRot > 180) {
++                            yRot -= 360;
++                        }
++                        if (yRot < -180) {
++                            yRot += 360;
++                        }
++                    }
++
++                    Vec3 playerPosition = finalPosition.getCenter().add(0, 0.6, 0);
++
++                    RandomEndSpawn ret = new RandomEndSpawn();
++                    ret.position = playerPosition;
++                    ret.yRot = yRot;
++
++                    LOGGER.info("Random end spawn - calculated position: {} facing {}", playerPosition, yRot);
++                    position.accept(ret);
++                }
++        );
++    }
++}
+diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity/Entity.java
+index 3df00628e64f55f86095f4b7d35a116515e49628..0dbd00b417dd7d3bdf25beaa569030db38ad1fa0 100644
+--- a/net/minecraft/world/entity/Entity.java
++++ b/net/minecraft/world/entity/Entity.java
+@@ -1,5 +1,6 @@
+ package net.minecraft.world.entity;
+ 
++import com.github.shyally.RandomEndSpawnFinder;
+ import com.google.common.collect.ImmutableList;
+ import com.google.common.collect.Lists;
+ import com.google.common.collect.Sets;
+@@ -24,6 +25,7 @@ import java.util.Objects;
+ import java.util.Optional;
+ import java.util.Set;
+ import java.util.UUID;
++import java.util.concurrent.ThreadLocalRandom;
+ import java.util.concurrent.atomic.AtomicInteger;
+ import java.util.function.BiConsumer;
+ import java.util.function.Predicate;
+@@ -91,6 +93,7 @@ import net.minecraft.world.Nameable;
+ import net.minecraft.world.attribute.EnvironmentAttributes;
+ import net.minecraft.world.damagesource.DamageSource;
+ import net.minecraft.world.damagesource.DamageSources;
++import net.minecraft.world.entity.item.FallingBlockEntity;
+ import net.minecraft.world.entity.item.ItemEntity;
+ import net.minecraft.world.entity.player.Player;
+ import net.minecraft.world.entity.projectile.Projectile;
+@@ -3515,6 +3518,12 @@ public abstract class Entity implements SyncedDataHolder, DebugValueSource, Name
+         if (this.level() instanceof ServerLevel serverLevel) {
+             this.processPortalCooldown();
+             if (this.portalProcess != null) {
++                // LHC start - allow duplicating falling blocks
++                boolean canUsePortal = this.canUsePortal(false);
++                if (!canUsePortal && !isAlive() && this instanceof FallingBlockEntity fbe) {
++                    fbe.spawnAtLocation(serverLevel, fbe.blockState.getBlock());
++                }
++                // LHC end
+                 if (this.portalProcess.processPortalTeleportation(serverLevel, this, this.canUsePortal(false))) {
+                     ProfilerFiller profilerFiller = Profiler.get();
+                     profilerFiller.push("portal");
+@@ -4728,8 +4737,13 @@ public abstract class Entity implements SyncedDataHolder, DebugValueSource, Name
+         EntityTreeNode passengerTree = this.detachPassengers();
+         List<EntityTreeNode> fullPassengerTree = passengerTree.getFullTree();
+         ServerLevel originWorld = (ServerLevel)this.level;
+-
++        // LHC Begin - isPlayerTeleport define
++        boolean isPlayerTeleport = false;
++        // LHC End
+         for (EntityTreeNode node : fullPassengerTree) {
++            // LHC Begin - isPlayerTeleport set
++            isPlayerTeleport = isPlayerTeleport || node.root instanceof ServerPlayer;
++            // LHC End
+             node.root.preChangeDimension();
+             node.root.prePortalLogic(originWorld, destination, type);
+         }
+@@ -4787,7 +4801,22 @@ public abstract class Entity implements SyncedDataHolder, DebugValueSource, Name
+                 }
+             );
+         });
+-
++        // LHC Begin - find random position when possible
++        if (isPlayerTeleport && type == PortalType.END && destination.getTypeKey() == net.minecraft.world.level.dimension.LevelStem.END) {
++            final ca.spottedleaf.concurrentutil.completable.CallbackCompletable<TeleportTransition> originalPortalInfoCompletable = portalInfoCompletable;
++            portalInfoCompletable = new ca.spottedleaf.concurrentutil.completable.CallbackCompletable<>();
++
++            portalInfoCompletable.addWaiter((TeleportTransition info, Throwable throwable) -> {
++                RandomEndSpawnFinder.asyncFindRandomEndSpawn(destination, (spawn) -> {
++                    TeleportTransition newTransition = info;
++                    if (spawn != null) {
++                        newTransition = info.withPosition(spawn.position).withRotation(spawn.yRot, info.xRot());
++                    }
++                    originalPortalInfoCompletable.complete(newTransition);
++                });
++            });
++        }
++        // LHC End
+ 
+         passengerTree.root.findOrCreatePortalAsync(originWorld, portalPos, destination, type, portalInfoCompletable);
+ 
 diff --git a/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl.java b/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl.java
 index 7d8c528a76e6a95d27368bc459d654c6ef66dd8f..bf76f4d883a6bae6a99878f8aa5e7dcdc0265a90 100644
 --- a/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl.java
@@ -21,3 +227,71 @@ index 7d8c528a76e6a95d27368bc459d654c6ef66dd8f..bf76f4d883a6bae6a99878f8aa5e7dcd
          final boolean onPortalCooldown = source.isOnPortalCooldown();
          // ignore retired callback, in those cases we do not want to teleport
          source.getBukkitEntity().taskScheduler.schedule(
+diff --git a/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java b/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java
+index 23f1b6dc3b43b12c868070c3d6b803d426ec8623..8bc12a6356cd8dfc110a2b3d19e6c3c27a1759e3 100644
+--- a/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java
++++ b/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java
+@@ -1,5 +1,6 @@
+ package net.minecraft.world.level.block.entity;
+ 
++import ca.spottedleaf.moonrise.common.util.TickThread;
+ import com.mojang.logging.LogUtils;
+ import net.minecraft.core.BlockPos;
+ import net.minecraft.core.Direction;
+@@ -9,6 +10,7 @@ import net.minecraft.data.worldgen.features.EndFeatures;
+ import net.minecraft.nbt.CompoundTag;
+ import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+ import net.minecraft.server.level.ServerLevel;
++import net.minecraft.server.level.ServerPlayer;
+ import net.minecraft.util.Mth;
+ import net.minecraft.util.RandomSource;
+ import net.minecraft.world.level.BlockGetter;
+@@ -20,6 +22,7 @@ import net.minecraft.world.level.block.state.BlockState;
+ import net.minecraft.world.level.chunk.LevelChunk;
+ import net.minecraft.world.level.levelgen.feature.Feature;
+ import net.minecraft.world.level.levelgen.feature.configurations.EndGatewayConfiguration;
++import net.minecraft.world.level.portal.TeleportTransition;
+ import net.minecraft.world.level.storage.ValueInput;
+ import net.minecraft.world.level.storage.ValueOutput;
+ import net.minecraft.world.phys.Vec3;
+@@ -200,6 +203,40 @@ public class TheEndGatewayBlockEntity extends TheEndPortalBlockEntity {
+ 
+ 
+         if (isExactTeleport) {
++            // LHC Begin - Random end gateway spawn
++            if (teleportPos.getX() == 100 && teleportPos.getY() == 50 && teleportPos.getZ() == 0 && toTeleport instanceof ServerPlayer) {
++                int chunkX = toTeleport.getBlockX() >> 4;
++                int chunkZ = toTeleport.getBlockZ() >> 4;
++
++                // Return portals are always hard coded to these cords
++                RandomEndSpawnFinder.asyncFindRandomEndSpawn(portalWorld, (spawn) -> {
++                    final TeleportTransition newTeleport;
++                    if (spawn == null) {
++                        newTeleport = teleport;
++                    } else {
++                        newTeleport = teleport.withPosition(spawn.position).withRotation(spawn.yRot, teleport.xRot());
++                    }
++                    io.papermc.paper.threadedregions.RegionizedServer.getInstance().taskQueue.queueTickTaskQueue(
++                            portalWorld,
++                            chunkX,
++                            chunkZ,
++                            () -> {
++                                // Somehow the player went somewhere else
++                                if (!TickThread.isTickThreadFor(toTeleport)) {
++                                    return;
++                                }
++
++                                toTeleport.teleportAsync(
++                                        newTeleport,
++                                        net.minecraft.world.entity.Entity.TELEPORT_FLAG_LOAD_CHUNK | net.minecraft.world.entity.Entity.TELEPORT_FLAG_TELEPORT_PASSENGERS,
++                                        post == null ? null : (net.minecraft.world.entity.Entity teleportedEntity) -> { post.onTransition(teleportedEntity); }
++                                );
++                            }
++                    );
++                });
++                return true;
++            }
++            // LHC End
+             // blind teleport
+             return toTeleport.teleportAsync(
+                 teleport, net.minecraft.world.entity.Entity.TELEPORT_FLAG_LOAD_CHUNK | net.minecraft.world.entity.Entity.TELEPORT_FLAG_TELEPORT_PASSENGERS,
