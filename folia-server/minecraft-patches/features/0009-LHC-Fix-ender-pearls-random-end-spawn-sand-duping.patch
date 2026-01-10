@@ -3,7 +3,6 @@ From: ShyAlly <1447610+ShyAlly@users.noreply.github.com>
 Date: Sat, 10 Jan 2026 12:46:49 -0500
 Subject: [PATCH] LHC - Fix ender pearls, random end spawn, sand duping
 
-LHC - Fix imports
 
 diff --git a/com/github/shyally/RandomEndSpawn.java b/com/github/shyally/RandomEndSpawn.java
 new file mode 100644
@@ -22,7 +21,7 @@ index 0000000000000000000000000000000000000000..82bd05a38f09e2c2c33fbd7a606a034d
 +}
 diff --git a/com/github/shyally/RandomEndSpawnFinder.java b/com/github/shyally/RandomEndSpawnFinder.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..dc9d7d7bacfb38e7528d4554e51dbc6531cdcf9e
+index 0000000000000000000000000000000000000000..f48c80b88d1609df084e77a2bc1cf353ed2b3d9c
 --- /dev/null
 +++ b/com/github/shyally/RandomEndSpawnFinder.java
 @@ -0,0 +1,105 @@
@@ -46,7 +45,7 @@ index 0000000000000000000000000000000000000000..dc9d7d7bacfb38e7528d4554e51dbc65
 +
 +    public static void asyncFindRandomEndSpawn(ServerLevel destination, Consumer<RandomEndSpawn> position) {
 +        BlockPos center = new BlockPos(0, 0, 0);
-+        final int radius = 80;
++        final int radius = 50;
 +
 +        destination.moonrise$loadChunksAsync(
 +                center,
@@ -227,7 +226,7 @@ index 7d8c528a76e6a95d27368bc459d654c6ef66dd8f..bf76f4d883a6bae6a99878f8aa5e7dcd
          // ignore retired callback, in those cases we do not want to teleport
          source.getBukkitEntity().taskScheduler.schedule(
 diff --git a/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java b/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java
-index 23f1b6dc3b43b12c868070c3d6b803d426ec8623..d2aaa4e3f605a006229acf6983e96f00c713c36e 100644
+index 23f1b6dc3b43b12c868070c3d6b803d426ec8623..723681a222ce2b1e1d56f77add12c38f44aa834d 100644
 --- a/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java
 +++ b/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java
 @@ -1,5 +1,7 @@
@@ -254,7 +253,7 @@ index 23f1b6dc3b43b12c868070c3d6b803d426ec8623..d2aaa4e3f605a006229acf6983e96f00
  import net.minecraft.world.level.storage.ValueInput;
  import net.minecraft.world.level.storage.ValueOutput;
  import net.minecraft.world.phys.Vec3;
-@@ -200,6 +204,40 @@ public class TheEndGatewayBlockEntity extends TheEndPortalBlockEntity {
+@@ -200,6 +204,45 @@ public class TheEndGatewayBlockEntity extends TheEndPortalBlockEntity {
  
  
          if (isExactTeleport) {
@@ -282,7 +281,12 @@ index 23f1b6dc3b43b12c868070c3d6b803d426ec8623..d2aaa4e3f605a006229acf6983e96f00
 +                                }
 +
 +                                toTeleport.teleportAsync(
-+                                        newTeleport,
++                                        newTeleport.newLevel(),
++                                        newTeleport.position(),
++                                        newTeleport.yRot(),
++                                        newTeleport.xRot(),
++                                        Vec3.ZERO,
++                                        newTeleport.cause(),
 +                                        net.minecraft.world.entity.Entity.TELEPORT_FLAG_LOAD_CHUNK | net.minecraft.world.entity.Entity.TELEPORT_FLAG_TELEPORT_PASSENGERS,
 +                                        post == null ? null : (net.minecraft.world.entity.Entity teleportedEntity) -> { post.onTransition(teleportedEntity); }
 +                                );
