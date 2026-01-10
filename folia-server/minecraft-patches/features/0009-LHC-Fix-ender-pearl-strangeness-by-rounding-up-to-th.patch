@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ShyAlly <1447610+ShyAlly@users.noreply.github.com>
+Date: Sat, 10 Jan 2026 12:46:49 -0500
+Subject: [PATCH] LHC - Fix ender pearl strangeness by rounding up to the
+ nearest 100th Y level
+
+
+diff --git a/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl.java b/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl.java
+index 7d8c528a76e6a95d27368bc459d654c6ef66dd8f..bf76f4d883a6bae6a99878f8aa5e7dcdc0265a90 100644
+--- a/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl.java
++++ b/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl.java
+@@ -76,7 +76,10 @@ public class ThrownEnderpearl extends ThrowableItemProjectile {
+     }
+ 
+     // Folia start - region threading
+-    private static void attemptTeleport(Entity source, ServerLevel checkWorld, net.minecraft.world.phys.Vec3 to) {
++    // LHC Start - Fix ender pearls fucking your shit up
++    private static void attemptTeleport(Entity source, ServerLevel checkWorld, net.minecraft.world.phys.Vec3 originalTo) {
++        final Vec3 to = new Vec3(originalTo.x, Math.ceil(originalTo.y * 100) / 100, originalTo.z);
++        // LHC End
+         final boolean onPortalCooldown = source.isOnPortalCooldown();
+         // ignore retired callback, in those cases we do not want to teleport
+         source.getBukkitEntity().taskScheduler.schedule(

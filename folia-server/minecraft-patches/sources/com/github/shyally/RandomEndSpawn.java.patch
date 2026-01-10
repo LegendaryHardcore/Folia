@@ -1,0 +1,12 @@
+--- /dev/null
++++ b/com/github/shyally/RandomEndSpawn.java
+@@ -1,0 +_,9 @@
++package com.github.shyally;
++
++import net.minecraft.world.phys.Vec3;
++
++public class RandomEndSpawn {
++
++    public Vec3 position;
++    public float yRot;
++}

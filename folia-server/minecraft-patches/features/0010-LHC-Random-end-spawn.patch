@@ -1,0 +1,57 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ShyAlly <1447610+ShyAlly@users.noreply.github.com>
+Date: Sat, 10 Jan 2026 12:48:18 -0500
+Subject: [PATCH] LHC - Random end spawn
+
+
+diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity/Entity.java
+index 3df00628e64f55f86095f4b7d35a116515e49628..8367e5cdf545e0434cf6fdcca9c09a14a5dbd7e7 100644
+--- a/net/minecraft/world/entity/Entity.java
++++ b/net/minecraft/world/entity/Entity.java
+@@ -24,6 +24,7 @@ import java.util.Objects;
+ import java.util.Optional;
+ import java.util.Set;
+ import java.util.UUID;
++import java.util.concurrent.ThreadLocalRandom;
+ import java.util.concurrent.atomic.AtomicInteger;
+ import java.util.function.BiConsumer;
+ import java.util.function.Predicate;
+@@ -4728,8 +4729,13 @@ public abstract class Entity implements SyncedDataHolder, DebugValueSource, Name
+         EntityTreeNode passengerTree = this.detachPassengers();
+         List<EntityTreeNode> fullPassengerTree = passengerTree.getFullTree();
+         ServerLevel originWorld = (ServerLevel)this.level;
+-
++        // LHC Begin - isPlayerTeleport define
++        boolean isPlayerTeleport = false;
++        // LHC End
+         for (EntityTreeNode node : fullPassengerTree) {
++            // LHC Begin - isPlayerTeleport set
++            isPlayerTeleport = isPlayerTeleport || node.root instanceof ServerPlayer;
++            // LHC End
+             node.root.preChangeDimension();
+             node.root.prePortalLogic(originWorld, destination, type);
+         }
+@@ -4787,7 +4793,22 @@ public abstract class Entity implements SyncedDataHolder, DebugValueSource, Name
+                 }
+             );
+         });
+-
++        // LHC Begin - find random position when possible
++        if (isPlayerTeleport && type == PortalType.END && destination.getTypeKey() == net.minecraft.world.level.dimension.LevelStem.END) {
++            final ca.spottedleaf.concurrentutil.completable.CallbackCompletable<TeleportTransition> originalPortalInfoCompletable = portalInfoCompletable;
++            portalInfoCompletable = new ca.spottedleaf.concurrentutil.completable.CallbackCompletable<>();
++
++            portalInfoCompletable.addWaiter((TeleportTransition info, Throwable throwable) -> {
++                RandomEndSpawnFinder.asyncFindRandomEndSpawn(destination, (spawn) -> {
++                    TeleportTransition newTransition = info;
++                    if (spawn != null) {
++                        newTransition = info.withPosition(spawn.position).withRotation(spawn.yRot, info.xRot());
++                    }
++                    originalPortalInfoCompletable.complete(newTransition);
++                });
++            });
++        }
++        // LHC End
+ 
+         passengerTree.root.findOrCreatePortalAsync(originWorld, portalPos, destination, type, portalInfoCompletable);
+ 

@@ -1,0 +1,108 @@
+--- /dev/null
++++ b/com/github/shyally/RandomEndSpawnFinder.java
+@@ -1,0 +_,105 @@
++package com.github.shyally;
++
++import com.mojang.logging.LogUtils;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.server.level.ServerLevel;
++import net.minecraft.world.level.block.state.BlockState;
++import net.minecraft.world.level.levelgen.Heightmap;
++import net.minecraft.world.phys.Vec3;
++import org.slf4j.Logger;
++
++import java.util.concurrent.ThreadLocalRandom;
++import java.util.function.Consumer;
++
++public class RandomEndSpawnFinder {
++
++    private static final Logger LOGGER = LogUtils.getLogger();
++
++    public static void asyncFindRandomEndSpawn(ServerLevel destination, Consumer<RandomEndSpawn> position) {
++        BlockPos center = new BlockPos(0, 0, 0);
++        final int radius = 80;
++
++        destination.moonrise$loadChunksAsync(
++                center,
++                radius + 16,
++                ca.spottedleaf.concurrentutil.util.Priority.HIGH,
++                (chunks) -> {
++                    // Keep chunks loaded for a bit
++                    for (net.minecraft.world.level.chunk.ChunkAccess access : chunks) {
++                        destination.moonrise$getChunkTaskScheduler().chunkHolderManager.addTicketAtLevel(
++                                net.minecraft.server.level.TicketType.DELAYED,
++                                access.getPos(),
++                                ca.spottedleaf.moonrise.patches.chunk_system.scheduling.ChunkHolderManager.FULL_LOADED_TICKET_LEVEL,
++                                null
++                        );
++                    }
++
++                    var random = ThreadLocalRandom.current();
++
++                    // Limit attempts in case someone does something silly
++                    // If it fails we'll end up at the regular end spawn
++                    BlockPos finalPosition = null;
++                    for (int i = 0; i < radius * 4; i++) {
++                        BlockPos randomPositionYZero = new BlockPos(center.getX() + random.nextInt(radius * 2) - radius, center.getY(), center.getZ() + random.nextInt(radius * 2) - radius);
++                        BlockPos potentialPosition = destination.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, randomPositionYZero);
++                        if (potentialPosition.getY() > 0) {
++                            potentialPosition = potentialPosition.atY(potentialPosition.getY() - 1);
++
++                            BlockState landingBlock = destination.getBlockStateIfLoaded(potentialPosition);
++                            if (landingBlock == null) {
++                                LOGGER.info("Random end spawn - Potential location wasn't loaded?");
++                                continue;
++                            }
++                            if (!landingBlock.isSolidRender()) {
++                                continue;
++                            }
++
++                            // Yay we found one
++                            finalPosition = potentialPosition;
++                            break;
++                        }
++                    }
++
++                    if (finalPosition == null) {
++                        LOGGER.info("Random end spawn - Failed to find a suitable spot");
++                        position.accept(null);
++                        return;
++                    }
++
++                    float yRot;
++                    if (finalPosition.getX() == 0) {
++                        if (finalPosition.getZ() < 0) {
++                            yRot = Direction.SOUTH.toYRot();
++                        } else {
++                            yRot = Direction.NORTH.toYRot();
++                        }
++                    } else if (finalPosition.getZ() == 0) {
++                        if (finalPosition.getX() < 0) {
++                            yRot = Direction.EAST.toYRot();
++                        } else {
++                            yRot = Direction.WEST.toYRot();
++                        }
++                    } else {
++                        double degrees = Math.toDegrees(Math.atan2(finalPosition.getZ() * -1, finalPosition.getX() * -1));
++                        yRot = (float) (degrees - 90);
++                        if (yRot > 180) {
++                            yRot -= 360;
++                        }
++                        if (yRot < -180) {
++                            yRot += 360;
++                        }
++                    }
++
++                    Vec3 playerPosition = finalPosition.getCenter().add(0, 0.6, 0);
++
++                    RandomEndSpawn ret = new RandomEndSpawn();
++                    ret.position = playerPosition;
++                    ret.yRot = yRot;
++
++                    LOGGER.info("Random end spawn - calculated position: {} facing {}", playerPosition, yRot);
++                    position.accept(ret);
++                }
++        );
++    }
++}
