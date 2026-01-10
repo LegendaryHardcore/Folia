@@ -1,10 +1,9 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: ShyAlly <1447610+ShyAlly@users.noreply.github.com>
 Date: Sat, 10 Jan 2026 12:46:49 -0500
-Subject: [PATCH] LHC - Fix ender pearl strangeness by rounding up to the
- nearest 100th Y level LHC - Random end spawn, random gateway spawn LHC -
- Allowing falling block entity duplication
+Subject: [PATCH] LHC - Fix ender pearls, random end spawn, sand duping
 
+LHC - Fix imports
 
 diff --git a/com/github/shyally/RandomEndSpawn.java b/com/github/shyally/RandomEndSpawn.java
 new file mode 100644
@@ -228,17 +227,18 @@ index 7d8c528a76e6a95d27368bc459d654c6ef66dd8f..bf76f4d883a6bae6a99878f8aa5e7dcd
          // ignore retired callback, in those cases we do not want to teleport
          source.getBukkitEntity().taskScheduler.schedule(
 diff --git a/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java b/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java
-index 23f1b6dc3b43b12c868070c3d6b803d426ec8623..8bc12a6356cd8dfc110a2b3d19e6c3c27a1759e3 100644
+index 23f1b6dc3b43b12c868070c3d6b803d426ec8623..d2aaa4e3f605a006229acf6983e96f00c713c36e 100644
 --- a/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java
 +++ b/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java
-@@ -1,5 +1,6 @@
+@@ -1,5 +1,7 @@
  package net.minecraft.world.level.block.entity;
  
 +import ca.spottedleaf.moonrise.common.util.TickThread;
++import com.github.shyally.RandomEndSpawnFinder;
  import com.mojang.logging.LogUtils;
  import net.minecraft.core.BlockPos;
  import net.minecraft.core.Direction;
-@@ -9,6 +10,7 @@ import net.minecraft.data.worldgen.features.EndFeatures;
+@@ -9,6 +11,7 @@ import net.minecraft.data.worldgen.features.EndFeatures;
  import net.minecraft.nbt.CompoundTag;
  import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
  import net.minecraft.server.level.ServerLevel;
@@ -246,7 +246,7 @@ index 23f1b6dc3b43b12c868070c3d6b803d426ec8623..8bc12a6356cd8dfc110a2b3d19e6c3c2
  import net.minecraft.util.Mth;
  import net.minecraft.util.RandomSource;
  import net.minecraft.world.level.BlockGetter;
-@@ -20,6 +22,7 @@ import net.minecraft.world.level.block.state.BlockState;
+@@ -20,6 +23,7 @@ import net.minecraft.world.level.block.state.BlockState;
  import net.minecraft.world.level.chunk.LevelChunk;
  import net.minecraft.world.level.levelgen.feature.Feature;
  import net.minecraft.world.level.levelgen.feature.configurations.EndGatewayConfiguration;
@@ -254,7 +254,7 @@ index 23f1b6dc3b43b12c868070c3d6b803d426ec8623..8bc12a6356cd8dfc110a2b3d19e6c3c2
  import net.minecraft.world.level.storage.ValueInput;
  import net.minecraft.world.level.storage.ValueOutput;
  import net.minecraft.world.phys.Vec3;
-@@ -200,6 +203,40 @@ public class TheEndGatewayBlockEntity extends TheEndPortalBlockEntity {
+@@ -200,6 +204,40 @@ public class TheEndGatewayBlockEntity extends TheEndPortalBlockEntity {
  
  
          if (isExactTeleport) {
