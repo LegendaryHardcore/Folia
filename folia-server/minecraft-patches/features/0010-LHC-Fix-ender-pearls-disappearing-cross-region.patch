@@ -1,0 +1,19 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ShyAlly <1447610+ShyAlly@users.noreply.github.com>
+Date: Mon, 12 Jan 2026 09:46:17 -0500
+Subject: [PATCH] LHC - Fix ender pearls disappearing cross region
+
+
+diff --git a/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl.java b/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl.java
+index bf76f4d883a6bae6a99878f8aa5e7dcdc0265a90..f90d6cba3e283d0b49a4f9ec6a50e4773e551adb 100644
+--- a/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl.java
++++ b/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl.java
+@@ -260,7 +260,7 @@ public class ThrownEnderpearl extends ThrowableItemProjectile {
+             int sectionPosZ = SectionPos.blockToSectionCoord(this.position().z());
+             Entity entity = this.owner != null ? findOwnerIncludingDeadPlayer(serverLevel, this.owner.getUUID()) : null;
+             if (entity instanceof ServerPlayer serverPlayer
+-                && !entity.isAlive()
++                && serverPlayer.getHealth() <= 0.0f // Folia - region threading
+                 && !serverPlayer.wonGame
+                 && serverPlayer.level().getGameRules().get(GameRules.ENDER_PEARLS_VANISH_ON_DEATH)) {
+                 this.discard(org.bukkit.event.entity.EntityRemoveEvent.Cause.DESPAWN); // CraftBukkit - add Bukkit remove cause

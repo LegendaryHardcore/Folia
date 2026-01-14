@@ -1,0 +1,20 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ShyAlly <1447610+ShyAlly@users.noreply.github.com>
+Date: Wed, 14 Jan 2026 02:19:19 -0500
+Subject: [PATCH] LHC - Doesnt seem like it's necessary to refresh goals
+ actually
+
+
+diff --git a/net/minecraft/world/entity/npc/villager/Villager.java b/net/minecraft/world/entity/npc/villager/Villager.java
+index 8616a8f5b720eac2bb5b3d78a3b69d40bb0b5547..f859f87bd79910f45c4ee8aff684dc4098427521 100644
+--- a/net/minecraft/world/entity/npc/villager/Villager.java
++++ b/net/minecraft/world/entity/npc/villager/Villager.java
+@@ -250,7 +250,7 @@ public class Villager extends AbstractVillager implements ReputationEventHandler
+         villagerBrain.setCoreActivities(ImmutableSet.of(Activity.CORE));
+         villagerBrain.setDefaultActivity(Activity.IDLE);
+         villagerBrain.setActiveActivityIfPossible(Activity.IDLE);
+-        villagerBrain.updateActivityFromSchedule(this.level().environmentAttributes(), this.level().getLevelData().getGameTime(), this.position()); // Folia - region threading - not in the world yet
++        //villagerBrain.updateActivityFromSchedule(this.level().environmentAttributes(), this.level().getLevelData().getGameTime(), this.position()); // Folia - region threading - not in the world yet
+     }
+ 
+     @Override
